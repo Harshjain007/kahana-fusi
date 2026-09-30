@@ -1,0 +1,181 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Kahana Fusi</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfa; --side: #f3f2ef; --card: #fff; --line: #e7e5e0; --text: #1c1b19; --muted: #8a867e; --accent: #d9480f; --ok: #2b8a3e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #19191a; --side: #151516; --card: #222224; --line: #2e2e31; --text: #ecebe8; --muted: #8d8b86; --accent: #ff8a4c; --ok: #69db7c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, sans-serif; color: var(--text); background: var(--bg);
+         display: grid; grid-template-columns: 210px 1fr; height: 100vh; }
+  aside { background: var(--side); border-right: 1px solid var(--line); padding: 44px 12px 16px; display: flex; flex-direction: column; gap: 2px;
+          -webkit-app-region: drag; }
+  aside h1 { font-size: 15px; margin: 0 10px 18px; letter-spacing: -.01em; }
+  aside h1 { display: flex; align-items: center; gap: 8px; }
+  nav { -webkit-app-region: no-drag; }
+  nav button { all: unset; display: block; width: 100%; box-sizing: border-box; padding: 7px 10px; border-radius: 7px;
+               cursor: default; color: var(--muted); }
+  nav button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px #0001; }
+  nav button:hover:not(.on) { color: var(--text); }
+  .hint { margin-top: auto; font-size: 12px; color: var(--muted); padding: 10px; }
+  kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; background: var(--card); }
+
+  main { overflow-y: auto; padding: 36px 40px 60px; }
+  section { display: none; max-width: 860px; }
+  section.on { display: block; }
+  h2 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.02em; }
+  .sub { color: var(--muted); margin: 0 0 22px; }
+
+  #search { width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: inherit; font: inherit; margin-bottom: 18px; }
+  .day { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 22px 0 8px; }
+  .item { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+  .meta { display: flex; gap: 10px; font-size: 12px; color: var(--muted); margin-bottom: 8px; align-items: center; }
+  .meta .sp { flex: 1; }
+  .meta button { all: unset; cursor: pointer; color: var(--muted); font-size: 12px; }
+  .meta button:hover { color: var(--text); }
+  .meta .save { color: var(--accent); font-weight: 600; display: none; }
+  .item.dirty .save { display: inline; }
+  .clean { outline: none; white-space: pre-wrap; border-radius: 4px; }
+  .clean:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+  details { margin-top: 10px; }
+  summary { font-size: 12px; color: var(--muted); cursor: pointer; list-style: none; }
+  summary::before { content: '▸ '; }
+  details[open] summary::before { content: '▾ '; }
+  .raw { color: var(--muted); font-size: 13px; margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--line); white-space: pre-wrap; }
+  .empty { color: var(--muted); text-align: center; padding: 60px 0; }
+  .toast { position: fixed; bottom: 20px; right: 24px; background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px;
+           opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+
+  textarea { width: 100%; height: 360px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: inherit;
+             font: 13px/1.6 ui-monospace, monospace; resize: vertical; }
+  .btn { margin-top: 12px; padding: 8px 16px; border: 0; border-radius: 8px; background: var(--text); color: var(--bg); font: inherit; font-weight: 600; cursor: pointer; }
+
+  .model { display: grid; grid-template-columns: 150px 1fr auto; gap: 16px; align-items: center; padding: 14px 16px; background: var(--card);
+           border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; }
+  .model .role { color: var(--muted); font-size: 13px; }
+  .model .name { font-weight: 600; }
+  .model .detail { color: var(--muted); font-size: 12px; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--ok); white-space: nowrap; }
+  .tag.cloud { color: var(--accent); }
+  .facts { margin-top: 24px; color: var(--muted); font-size: 13px; }
+  .facts b { color: var(--text); font-weight: 500; }
+  @media (max-width: 760px) { .model { grid-template-columns: 1fr auto; } .model .role { grid-column: 1 / -1; } }
+</style></head>
+<body>
+<aside>
+  <h1><svg viewBox="0 0 512 512" width="26" height="26" aria-hidden="true">
+  <g transform="translate(-14 4)" fill="none" stroke-linecap="round">
+    <path d="M236 404 C168 402 130 344 130 262 C130 170 188 110 258 110 C322 110 364 158 364 222" stroke="currentColor" stroke-width="30"/>
+    <path d="M196 290 C186 222 218 174 262 174 C300 174 318 206 312 238 C306 268 276 276 260 258" stroke="currentColor" stroke-width="30"/>
+    <g stroke="var(--muted)" stroke-width="26">
+      <path d="M396 206 C354 250 330 300 326 360 C322 402 346 424 386 420 C408 418 424 406 432 392"/>
+      <path d="M432 238 C398 276 376 318 372 368"/>
+      <path d="M452 298 C428 324 416 350 414 378"/>
+    </g>
+  </g>
+</svg>Kahana Fusi</h1>
+  <nav>
+    <button data-p="history" class="on">History</button>
+    <button data-p="dictionary">Dictionary</button>
+    <button data-p="models">Models</button>
+  </nav>
+  <div class="hint">Hold <kbd>Right ⌥</kbd> anywhere to dictate.</div>
+</aside>
+
+<main>
+  <section id="history" class="on">
+    <h2>History</h2>
+    <p class="sub">What was written for you, newest first. Edit any text and press <b>Save &amp; learn</b> so it hears you better next time.</p>
+    <input id="search" placeholder="Search dictations…">
+    <div id="list"></div>
+  </section>
+
+  <section id="dictionary">
+    <h2>Dictionary</h2>
+    <p class="sub">Names and terms you use, one per line. Correction rules use <code>wrong =&gt; right</code>. Rules you teach from History are added here.</p>
+    <textarea id="dict" spellcheck="false"></textarea>
+    <button class="btn" id="saveDict">Save dictionary</button>
+  </section>
+
+  <section id="models">
+    <h2>Models</h2>
+    <p class="sub">What powers your dictation right now.</p>
+    <div id="modelList"></div>
+    <div class="facts" id="facts"></div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+let history = [];
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const toast = msg => { toast_.textContent = msg; toast_.classList.add('show'); setTimeout(() => toast_.classList.remove('show'), 1800); };
+const toast_ = $('#toast');
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button, section').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); $('#' + b.dataset.p).classList.add('on');
+});
+
+function dayLabel(d) {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  const diff = (t - new Date(d).setHours(0, 0, 0, 0)) / 864e5;
+  return diff === 0 ? 'Today' : diff === 1 ? 'Yesterday' : new Date(d).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+function render() {
+  const q = $('#search').value.toLowerCase();
+  const rows = history.filter(h => !q || (h.text + ' ' + h.raw).toLowerCase().includes(q));
+  if (!rows.length) return $('#list').innerHTML = `<div class="empty">${q ? 'No matches.' : 'No dictations yet. Hold Right ⌥ and start talking.'}</div>`;
+  let html = '', day = '';
+  for (const h of rows) {
+    const d = dayLabel(h.at);
+    if (d !== day) { html += `<div class="day">${d}</div>`; day = d; }
+    const time = new Date(h.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    html += `<div class="item" data-at="${h.at}">
+      <div class="meta"><span>${time}</span>${h.words ? `<span>${h.words} words</span>` : ''}${h.ms ? `<span>${(h.ms / 1000).toFixed(1)}s</span>` : ''}
+        <span class="sp"></span><button class="save">Save &amp; learn</button><button class="copy">Copy</button></div>
+      <div class="clean" contenteditable="plaintext-only" spellcheck="false">${esc(h.text)}</div>
+      <details><summary>What you said</summary><div class="raw">${esc(h.raw)}</div></details>
+    </div>`;
+  }
+  $('#list').innerHTML = html;
+}
+
+$('#list').addEventListener('input', e => {
+  const item = e.target.closest('.item'), h = history.find(x => x.at === item.dataset.at);
+  item.classList.toggle('dirty', e.target.innerText.trim() !== h.text);
+});
+$('#list').addEventListener('click', async e => {
+  const item = e.target.closest('.item'); if (!item) return;
+  const h = history.find(x => x.at === item.dataset.at), el = item.querySelector('.clean');
+  if (e.target.matches('.copy')) { navigator.clipboard.writeText(el.innerText.trim()); toast('Copied'); }
+  if (e.target.matches('.save')) {
+    const rule = await flow.learn(h.at, el.innerText);
+    h.text = el.innerText.trim(); item.classList.remove('dirty');
+    toast(rule ? `Learned: ${rule}` : 'Saved');
+    if (rule) $('#dict').value = (await flow.data()).dict;
+  }
+});
+$('#search').oninput = render;
+
+$('#saveDict').onclick = async () => { await flow.saveDict($('#dict').value); toast('Dictionary saved'); };
+
+flow.on('history:new', h => { history.unshift(h); render(); });
+
+flow.data().then(d => {
+  history = d.history; render();
+  $('#dict').value = d.dict;
+  $('#modelList').innerHTML = d.models.map(m => `<div class="model">
+    <div class="role">${m.role}</div>
+    <div><div class="name">${esc(m.name)}</div><div class="detail">${esc(m.detail)}</div></div>
+    <span class="tag ${m.where === 'Cloud' ? 'cloud' : ''}">${m.where}</span></div>`).join('');
+  $('#facts').innerHTML = `<p><b>Languages:</b> ${d.languages}</p><p><b>Your data:</b> ${esc(d.dataDir)}. Nothing leaves this Mac unless a model above says Cloud.</p>`;
+});
+</script>
+</body></html>

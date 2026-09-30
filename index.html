@@ -1,0 +1,58 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  html, body { margin: 0; background: transparent; font: 13px -apple-system, sans-serif; }
+  #pill { margin: 4px auto; width: 150px; height: 36px; border-radius: 18px; background: #111d;
+          color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  #dot { width: 10px; height: 10px; border-radius: 50%; background: #f44; transition: transform .05s; }
+  .thinking #dot { background: #6af; animation: p 1s infinite; }
+  @keyframes p { 50% { opacity: .3 } }
+</style></head>
+<body><div id="pill"><div id="dot"></div><span id="label">Listening</span></div>
+<script>
+const RATE = 16000;
+let cur = null; // each hold of the key is its own session, so a new press never touches the previous recording
+
+async function open() {
+  const rec = { chunks: [] };
+  rec.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, noiseSuppression: true, echoCancellation: true } });
+  rec.ctx = new AudioContext({ sampleRate: RATE });
+  const src = rec.ctx.createMediaStreamSource(rec.stream);
+  rec.node = rec.ctx.createScriptProcessor(4096, 1, 1); // ponytail: deprecated but zero-setup; AudioWorklet if it ever gets removed
+  rec.node.onaudioprocess = e => {
+    const d = e.inputBuffer.getChannelData(0);
+    rec.chunks.push(new Float32Array(d));
+    dot.style.transform = `scale(${1 + Math.min(2, Math.sqrt(d.reduce((a, x) => a + x * x, 0) / d.length) * 20)})`;
+  };
+  src.connect(rec.node); rec.node.connect(rec.ctx.destination);
+  return rec;
+}
+
+flow.on('state', s => {
+  document.body.className = s;
+  label.textContent = s === 'listening' ? 'Listening' : 'Thinking…';
+});
+
+flow.on('start', () => { cur = open(); });
+
+flow.on('stop', async () => {
+  const p = cur; cur = null;
+  const rec = await p;
+  await new Promise(r => setTimeout(r, 250)); // catch the tail of the last word
+  rec.node.disconnect(); rec.stream.getTracks().forEach(t => t.stop()); await rec.ctx.close();
+  const n = rec.chunks.reduce((a, c) => a + c.length, 0);
+  flow.send(n < RATE * 0.3 ? new ArrayBuffer(44) : wav(rec.chunks, n)); // too short -> main skips it
+});
+
+function wav(chunks, n) {
+  const b = new DataView(new ArrayBuffer(44 + n * 2));
+  const s = (o, str) => [...str].forEach((c, i) => b.setUint8(o + i, c.charCodeAt(0)));
+  s(0, 'RIFF'); b.setUint32(4, 36 + n * 2, true); s(8, 'WAVEfmt ');
+  b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 1, true);
+  b.setUint32(24, RATE, true); b.setUint32(28, RATE * 2, true); b.setUint16(32, 2, true); b.setUint16(34, 16, true);
+  s(36, 'data'); b.setUint32(40, n * 2, true);
+  let o = 44;
+  for (const c of chunks) for (const x of c) { b.setInt16(o, Math.max(-1, Math.min(1, x)) * 0x7fff, true); o += 2; }
+  return b.buffer;
+}
+</script></body></html>

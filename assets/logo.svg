@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <g transform="translate(-14 4)" fill="none" stroke-linecap="round">
+    <!-- ear: an open outer fold and an inward spiral -->
+    <path d="M236 404 C168 402 130 344 130 262 C130 170 188 110 258 110 C322 110 364 158 364 222" stroke="#1c1c1c" stroke-width="30"/>
+    <path d="M196 290 C186 222 218 174 262 174 C300 174 318 206 312 238 C306 268 276 276 260 258" stroke="#1c1c1c" stroke-width="30"/>
+    <!-- hand: cupped fingers flowing into the palm, in grey -->
+    <g stroke="#8c8c8c" stroke-width="26">
+      <path d="M396 206 C354 250 330 300 326 360 C322 402 346 424 386 420 C408 418 424 406 432 392"/>
+      <path d="M432 238 C398 276 376 318 372 368"/>
+      <path d="M452 298 C428 324 416 350 414 378"/>
+    </g>
+  </g>
+</svg>
