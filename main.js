@@ -260,5 +260,11 @@ app.whenReady().then(async () => {
   openMain();
 });
 
+// Windows only ever show the bundled pages: no navigating away, no pop-ups.
+app.on('web-contents-created', (_e, wc) => {
+  wc.on('will-navigate', e => e.preventDefault());
+  wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+});
+
 app.on('window-all-closed', () => {}); // stay in the menu bar when the main window closes
 app.on('will-quit', () => uIOhook.stop());
