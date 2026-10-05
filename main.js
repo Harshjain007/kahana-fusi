@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, clipboard, systemPreferences, Tray, Menu, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, clipboard, systemPreferences, Tray, Menu, nativeImage, screen, dialog, shell } = require('electron');
 const { execFile, spawn } = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 
@@ -57,10 +57,12 @@ const applyFixes = (text, fixes) =>
   fixes.reduce((t, [a, b]) => t.replace(new RegExp(`(?<![\\p{L}\\p{N}])${esc(a)}(?![\\p{L}\\p{N}])`, 'giu'), b), text);
 
 // ---------- speech -> text (whisper-server keeps the model warm; VAD strips silences) ----------
+let quitting = false;
 function startWhisper() {
   const p = spawn('whisper-server', ['-m', MODEL, '--host', '127.0.0.1', '--port', PORT,
     '--vad', '-vm', VAD, '-bs', '1', '-bo', '1', '-sns', '-t', '8'], { stdio: 'ignore' });
-  app.on('will-quit', () => p.kill());
+  p.on('exit', () => { if (!quitting) setTimeout(startWhisper, 2000); }); // crashed or killed: bring it back
+  app.once('will-quit', () => { quitting = true; p.kill(); });
 }
 
 async function whisper(wav, language, prompt) {
@@ -221,7 +223,15 @@ app.whenReady().then(async () => {
   if (!fs.existsSync(MODEL)) console.error(`No whisper model at ${MODEL}. Run: ./install.sh`);
   startWhisper();
   await systemPreferences.askForMediaAccess('microphone');
-  systemPreferences.isTrustedAccessibilityClient(true); // prompts for Accessibility (needed for hotkey + paste)
+  app.setLoginItemSettings({ openAtLogin: true }); // keep dictation available after a restart
+  // Without Accessibility the hotkey and paste fail silently, so say so.
+  // Rebuilding the unsigned app makes macOS treat it as new and drop the permission.
+  if (!systemPreferences.isTrustedAccessibilityClient(false)) {
+    const { response } = await dialog.showMessageBox({ type: 'warning', buttons: ['Open Settings', 'Later'],
+      message: 'Kahana Fusi needs Accessibility access',
+      detail: 'Holding Right Option and pasting text won\'t work without it.\n\nIn Privacy & Security → Accessibility, turn Kahana Fusi on. If it is already on, remove it with "–" and add it again. Then reopen Kahana Fusi.' });
+    if (response === 0) shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
+  }
   loadDict();
 
   const tray = new Tray(nativeImage.createFromPath(path.join(__dirname, 'assets/trayTemplate.png'))); // "Template" = macOS tints it for light/dark
