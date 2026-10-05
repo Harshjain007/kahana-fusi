@@ -222,15 +222,15 @@ app.whenReady().then(async () => {
   app.on('activate', openMain);
   if (!fs.existsSync(MODEL)) console.error(`No whisper model at ${MODEL}. Run: ./install.sh`);
   startWhisper();
-  await systemPreferences.askForMediaAccess('microphone');
+  systemPreferences.askForMediaAccess('microphone'); // don't wait: the hotkey must be live even while macOS asks
   app.setLoginItemSettings({ openAtLogin: true }); // keep dictation available after a restart
   // Without Accessibility the hotkey and paste fail silently, so say so.
   // Rebuilding the unsigned app makes macOS treat it as new and drop the permission.
   if (!systemPreferences.isTrustedAccessibilityClient(false)) {
-    const { response } = await dialog.showMessageBox({ type: 'warning', buttons: ['Open Settings', 'Later'],
+    dialog.showMessageBox({ type: 'warning', buttons: ['Open Settings', 'Later'],
       message: 'Kahana Fusi needs Accessibility access',
-      detail: 'Holding Right Option and pasting text won\'t work without it.\n\nIn Privacy & Security → Accessibility, turn Kahana Fusi on. If it is already on, remove it with "–" and add it again. Then reopen Kahana Fusi.' });
-    if (response === 0) shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
+      detail: 'Holding Right Option and pasting text won\'t work without it.\n\nIn Privacy & Security → Accessibility, turn Kahana Fusi on. If it is already on, remove it with "–" and add it again. Then reopen Kahana Fusi.' })
+      .then(({ response }) => response === 0 && shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility')); // never block startup on this
   }
   loadDict();
 
@@ -254,6 +254,12 @@ app.whenReady().then(async () => {
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   win.loadFile('index.html');
 
+  const DEBUG = process.env.KF_DEBUG;
+  if (DEBUG) { // KF_DEBUG=1 → ~/Library/Application Support/Kahana Fusi/debug.log
+    const log = (...a) => fs.appendFileSync(path.join(DATA, 'debug.log'), a.join(' ') + '\n');
+    log('start', new Date().toISOString(), 'accessibility trusted:', systemPreferences.isTrustedAccessibilityClient(false));
+    uIOhook.on('keydown', e => log('keydown', e.keycode, e.keycode === HOTKEY ? '(hotkey)' : ''));
+  }
   uIOhook.on('keydown', e => {
     if (e.keycode !== HOTKEY || recording) return;
     recording = true;
