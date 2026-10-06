@@ -6,7 +6,7 @@ Private, offline voice dictation for macOS. Hold a key, talk, let go, and clean 
 
 Everything runs on your Mac. Audio is never saved or uploaded.
 
-- **Languages:** English, Hindi and Hinglish only. If a clip is detected as any other language, it's transcribed again as Hindi.
+- **Languages:** English, Hindi and Hinglish, always written in Roman letters (Hinglish). Hindi is never translated into English, and other languages never slip in.
 - **Long dictation:** 1,000–1,500+ words in one go. Silences are removed before transcription, and cleanup runs in parallel on ~150-word chunks.
 - **Learns from you:** your corrections become dictionary rules that are applied to every future dictation.
 

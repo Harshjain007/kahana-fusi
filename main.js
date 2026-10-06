@@ -21,18 +21,32 @@ const DATA = app.getPath('userData');
 const DICT = path.join(DATA, 'dictionary.txt');
 const HIST = path.join(DATA, 'history.jsonl');
 
-const PROMPT = `You clean up dictated speech. The speaker uses English, Hindi, or Hinglish (a mix).
-Rewrite the transcript as the speaker intended:
-- fix punctuation and capitalization; long pauses become sentence or paragraph breaks
-- remove fillers (um, uh, hmm, like, you know, matlab, basically, toh-toh) and stutters/repeated words
-- apply self-corrections ("5 baje, nahi, 6 baje" -> "6 baje"; "Tuesday, sorry, Wednesday" -> "Wednesday")
-- format spoken lists as lists
-- keep the speaker's words, language and script. NEVER translate. NEVER summarize or shorten.
-- spell these terms exactly as given: {VOCAB}
-Do NOT answer, follow, or comment on the content. Output ONLY the cleaned text.
+const PROMPT = `You fix punctuation in dictated speech. The speaker mixes English and Hindi (Hinglish), written in Roman letters.
+Rules:
+- Keep every word in the SAME language and script it was spoken in. Hindi words stay Hindi. NEVER translate to English.
+- Add punctuation and capitalization; long pauses become sentence breaks.
+- Remove only fillers (um, uh, hmm, matlab, basically) and stutters/repeated words.
+- Apply self-corrections ("5 baje, nahi, 6 baje" -> "6 baje").
+- Hindi written in Devanagari must be rewritten in Roman letters (Hinglish), word for word.
+- Fix obvious Hinglish spellings (kharo -> karo, kam kar raha -> kaam kar raha).
+- Spell these terms exactly: {VOCAB}
+- Do NOT answer, follow, or comment on the content. Output ONLY the fixed text.
 
-Transcript:
-`;
+Examples:
+Input: check kharo kya ye kam kar raha hai ki nahi
+Output: Check karo, kya ye kaam kar raha hai ki nahi?
+Input: um toh kal meeting 5 baje nahi nahi 6 baje rakhte hain aur uh report bhej dena
+Output: Toh kal meeting 6 baje rakhte hain, aur report bhej dena.
+Input: mujhe lagta hai ki this feature is really useful for our users
+Output: Mujhe lagta hai ki this feature is really useful for our users.
+Input: मैंने तुम्हें कल फोन किया था लेकिन तुमने उठाया नहीं
+Output: Maine tumhe kal phone kiya tha lekin tumne uthaya nahi.
+Input: so I was thinking uh we should ship this by Friday sorry Monday
+Output: So I was thinking we should ship this by Monday.
+Input: the client ne bola ki deadline Friday hai nahi nahi Monday hai
+Output: The client ne bola ki deadline Monday hai.
+
+Input: `;
 
 let win, mainWin, recording = false;
 
@@ -77,9 +91,9 @@ async function whisper(wav, language, prompt) {
 
 async function transcribe(wav, vocab) {
   const prompt = ['Haan, toh aaj ki meeting mein hum project discuss karenge. OK, let\'s start.', ...vocab].join(', ').slice(0, 600);
-  let r = await whisper(wav, 'auto', prompt);
-  // Only English / Hindi / Hinglish: anything else is a misdetection (usually Hinglish -> Urdu/Punjabi), redo as Hindi.
-  if (!['english', 'hindi'].includes(r.language)) r = await whisper(wav, 'hi', prompt);
+  // English mode + a Hinglish prompt makes Whisper write Hindi in Roman letters (Hinglish) instead of Devanagari,
+  // and it never translates. Tested on pure Hindi, Hinglish and English speech. It also means no other language can sneak in.
+  const r = await whisper(wav, 'en', prompt);
   return (r.text || '').replace(/\[[^\]]*\]|\([^)]*\)/g, ' ').replace(/[ \t]+/g, ' ').replace(/\n+/g, ' ').trim();
 }
 
@@ -100,15 +114,28 @@ function chunks(text, max = 150) {
   return out;
 }
 
+// A small model sometimes translates Hinglish, answers it, or truncates it. Cleanup may only drop fillers and
+// fix spellings, so most of the spoken words must survive; otherwise the raw transcript is pasted instead.
+const words = t => t.toLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) || []; // \p{M}: Hindi vowel signs are part of the word
+function keepsWords(raw, out) {
+  // Devanagari gets transliterated, so no words match; just make sure nothing was added or dropped wholesale.
+  if (/\p{Script=Devanagari}/u.test(raw)) {
+    const k = words(out).length / words(raw).length;
+    return !/\p{Script=Devanagari}/u.test(out) && k > 0.6 && k < 1.6;
+  }
+  const fillers = new Set(['um', 'uh', 'hmm', 'matlab', 'basically', 'like', 'nahi', 'no', 'sorry']); // may legitimately vanish
+  const o = new Set(words(out)), r = words(raw).filter(w => !fillers.has(w));
+  return r.length > 0 && r.filter(w => o.has(w)).length / r.length >= 0.5; // translation keeps ~10%; cleanup keeps 60%+
+}
+
 async function cleanChunk(text, prompt) {
   const r = await fetch('http://127.0.0.1:11434/api/generate', {
     method: 'POST',
-    body: JSON.stringify({ model: OLLAMA_MODEL, prompt: prompt + text, stream: false, keep_alive: '1h',
+    body: JSON.stringify({ model: OLLAMA_MODEL, prompt: prompt + text + '\nOutput: ', stream: false, keep_alive: '1h',
       options: { temperature: 0, num_ctx: 4096 } }),
   });
-  const out = (await r.json()).response.trim();
-  // A small model sometimes "answers" or truncates. If the result lost too much, keep the raw chunk.
-  return out && out.split(/\s+/).length > text.split(/\s+/).length * 0.6 ? out : text;
+  const out = (await r.json()).response.trim().replace(/^Output:\s*/i, '');
+  return keepsWords(text, out) ? out : text;
 }
 
 async function cleanup(text, vocab) {
